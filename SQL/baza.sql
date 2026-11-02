@@ -123,15 +123,12 @@ CREATE TABLE rezerwacja_usluga (
 
 -- widoki
 
--- widok pokoi dla goscia z terminami kiedy są zajete - do kalendarza na stronie
+-- widok dla goscia - pokoje wolne w dniu dzisiejszym
 
-CREATE VIEW widok_dostepnosc_pokoi AS
-SELECT p.numer, t.nazwa AS typ, t.liczba_osob, t.cena_za_noc,
-       rp.data_od AS zajety_od, rp.data_do AS zajety_do
-FROM pokoj p
-JOIN typ_pokoju t ON t.id_typu = p.id_typu
-LEFT JOIN rezerwacja_pokoj rp ON rp.id_pokoju = p.id_pokoju
-ORDER BY p.numer, rp.data_od;
+CREATE VIEW widok_wolne_pokoje AS
+SELECT p.numer, t.nazwa AS typ, t.liczba_osob, t.cena_za_noc
+FROM pokoj p JOIN typ_pokoju t ON t.id_typu = p.id_typu 
+WHERE NOT EXISTS (SELECT 1 FROM rezerwacja_pokoj rp WHERE rp.id_pokoju = p.id_pokoju AND CURRENT_DATE >= rp.data_od AND CURRENT_DATE <  rp.data_do)
 
 -- widok platnosci dla recepcjonisty: widzi ile zaplacil gosc, ile brakuje jaki jest status, ulatwia ksiegowanie faktycznych platnosci
 
