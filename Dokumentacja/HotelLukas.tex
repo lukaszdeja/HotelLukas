@@ -1,0 +1,357 @@
+\documentclass[12pt,a4paper]{article}
+
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{lmodern}
+
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{indentfirst}         
+
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Bazy danych I}
+\rhead{System obsługi hotelu}
+\cfoot{\thepage}
+
+
+\usepackage{booktabs}            
+\usepackage{tabularx}             
+\usepackage{longtable}            
+\usepackage{array}
+\usepackage{multirow}
+
+
+\usepackage{graphicx}
+\usepackage{float}              
+\usepackage{caption}
+\usepackage{subcaption}
+\graphicspath{{img/}}
+
+
+\usepackage{enumitem}
+
+
+\usepackage{xcolor}
+\usepackage{listings}
+\lstset{
+  language=SQL,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{teal},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=2,
+  morekeywords={EXCLUDE, USING, GIST, RETURNS, TRIGGER, LANGUAGE, PLPGSQL,
+                RETURN, NEW, OLD, BEGIN, END, IF, THEN, RAISE, EXCEPTION,
+                daterange, numeric, serial},
+  literate={ą}{{\k{a}}}1 {ę}{{\k{e}}}1 {ć}{{\'c}}1 {ł}{{\l{}}}1
+           {ń}{{\'n}}1 {ó}{{\'o}}1 {ś}{{\'s}}1 {ź}{{\'z}}1 {ż}{{\.z}}1
+           {Ą}{{\k{A}}}1 {Ę}{{\k{E}}}1 {Ć}{{\'C}}1 {Ł}{{\L{}}}1
+           {Ń}{{\'N}}1 {Ó}{{\'O}}1 {Ś}{{\'S}}1 {Ź}{{\'Z}}1 {Ż}{{\.Z}}1
+}
+\renewcommand{\lstlistingname}{Listing}
+
+
+\usepackage[hidelinks]{hyperref}
+
+\begin{document}
+\begin{titlepage}
+  \centering
+  \vspace*{\fill}
+
+  {\Large Bazy danych I -- projekt zaliczeniowy\par}
+  \vspace{0.8cm}
+  {\Huge\bfseries HotelLukas\par}
+  \vspace{0.5cm}
+  {\large System obsługi hotelu -- dokumentacja projektu\par}
+
+  \vspace{2.5cm}
+
+  {\large Autor: \textbf{Łukasz Deja}\par}
+
+  \vspace{1cm}
+
+  {\normalsize Repozytorium projektu:\par}
+  \vspace{0.2cm}
+  {\normalsize\url{https://github.com/lukaszdeja/HotelDataBase}\par}
+
+  \vspace*{\fill}
+\end{titlepage}
+
+\section*{Część I: Projekt koncepcji i założenia}
+\addcontentsline{toc}{section}{Część I: Projekt koncepcji i założenia}
+
+\section{Temat projektu}
+
+\noindent Projekt realizuje system zarządzania hotelem. Jego celem jest umożliwienie rezerwacji pokoi hotelowych przez gości, wykrywanie kolizji przy rezerwacjach. Dodatkowo umożliwia generowanie i przeglądanie raportów z przychodów dla administratorów. W wersji rozszerzonej umożliwia także rezerwacje usług dodatkowych. Relacyjna baza danych PostgreSQL a także aplikacja webowa obsługują podział na role użytkowników.
+
+Zadania systemu:
+\begin{itemize}
+    \item Rejestracja konta i logowanie.
+    \item Rezerwacje pokojów oraz przechowywanie w bazie danych informacji o gościach oraz pokojach.
+    \item Rejestrowanie płatności (bez faktycznego transferu środków, tylko wpis w bazie).
+    \item Generowanie raportów - obłożenia pokoi, miesięcznych przychodów
+    \item Podział na role - gość, recepcjonista i administrator
+    \item \textbf{W wersji rozszerzonej: } system usług hotelowych (sauna, basen), rezerwacje usług
+\end{itemize}
+
+\section{Analiza wymagań użytkownika}
+
+\subsection{Historyjki użytkownika i priorytety}
+
+\noindent Wymagania zebrano w postaci historyjek użytkownika (backlog) dla trzech ról:
+gościa, recepcjonisty i administratora. Każdej historyjce nadano priorytet
+według metody MoSCoW: M (\emph{must} -- konieczne), S (\emph{should} --
+ważne), C (\emph{could} -- opcjonalne), W (\emph{won't} -- poza wersją
+podstawową; historyjki W realizuje wersja rozszerzona). Ostatnia kolumna
+wskazuje wymaganie funkcjonalne (punkt \ref{sec:wymagania}), które realizuje
+daną historyjkę.
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.7cm}
+                  >{\raggedright\arraybackslash}p{11cm}
+                  >{\centering\arraybackslash}p{0.9cm}
+                  >{\raggedright\arraybackslash}p{1.6cm}}
+\toprule
+\textbf{Nr} & \textbf{Historyjka} & \textbf{Prio.} & \textbf{Wym.} \\
+\midrule
+\endhead
+
+\multicolumn{4}{l}{\textit{Gość}} \\
+\midrule
+1  & Jako gość chcę utworzyć konto, podając swoje dane kontaktowe, aby móc rezerwować pokoje.
+   & M & \ref{f:rejestracja} \\
+2  & Jako gość chcę zalogować się i wylogować, aby móc korzystać z serwisu.
+   & M & \ref{f:logowanie} \\
+3  & Jako gość chcę zmienić swoje dane kontaktowe, aby hotel mógł się ze mną skontaktować.
+   & C & \ref{f:zmianadanych} \\
+4  & Jako gość chcę wyszukać wolne pokoje w wybranym terminie, aby wiedzieć, co i kiedy mogę zarezerwować.
+   & M & \ref{f:wolne} \\
+5  & Jako gość chcę zawęzić wyszukiwanie do wybranego typu pokoju i liczby osób, aby znaleźć pokój dopasowany do moich wymagań.
+   & S & \ref{f:wolne} \\
+6  & Jako gość chcę zarezerwować jeden lub więcej pokoi, aby móc spędzić wakacje w hotelu.
+   & M & \ref{f:rezerwacja} \\
+7  & Jako gość chcę mieć pewność, że system gwarantuje brak kolizji terminów, aby nikt nie zarezerwował mojego pokoju w moim terminie.
+   & M & \ref{f:kolizje} \\
+8  & Jako gość chcę poznać koszt pobytu przed potwierdzeniem rezerwacji, aby wiedzieć, ile zapłacę.
+   & S & \ref{f:koszt} \\
+9  & Jako gość chcę przeglądać swoje rezerwacje z sumą wpłat i statusem płatności, aby wiedzieć, ile zostało do zapłaty.
+   & M & \ref{f:status} \\
+10 & Jako gość chcę anulować rezerwację przed przyjazdem, jeśli jeszcze nic nie wpłaciłem, aby nie płacić za pobyt, z którego rezygnuję.
+   & S & \ref{f:anulowanie} \\
+11 & Jako gość chcę zarezerwować usługę (saunę, basen) na konkretny dzień i godzinę w trakcie pobytu, aby nie czekać w kolejce.
+   & W & \ref{f:rezerwacjauslugi} \\
+12 & Jako gość chcę widzieć łączny koszt pobytu razem z usługami, aby znać pełną kwotę do zapłaty.
+   & W & \ref{f:kosztuslug} \\
+\midrule
+\multicolumn{4}{l}{\textit{Recepcjonista}} \\
+\midrule
+13 & Jako recepcjonista chcę zalogować się do systemu na konto recepcjonisty, aby móc pracować.
+   & S & \ref{f:logowanierecepcja} \\
+14 & Jako recepcjonista chcę przeglądać i edytować dane gości, aby kontrolować, czy są wprowadzone poprawnie.
+   & C & \ref{f:danegosci} \\
+15 & Jako recepcjonista chcę przeglądać wszystkie rezerwacje, aby kontrolować sytuację hotelu.
+   & M & \ref{f:danegosci} \\
+16 & Jako recepcjonista chcę zaksięgować zaliczkę i dopłatę za rezerwację, aby wiedzieć, które rezerwacje są już opłacone.
+   & M & \ref{f:wplaty} \\
+17 & Jako recepcjonista chcę, aby nie dało się wpłacić więcej niż pozostały koszt, aby uniknąć nadpłat i zwrotów.
+   & S & \ref{f:nadplata} \\
+\midrule
+\multicolumn{4}{l}{\textit{Administrator}} \\
+\midrule
+18 & Jako administrator chcę zalogować się do systemu na konto administratora, aby zarządzać hotelem.
+   & S & \ref{f:logowanieadmin} \\
+19 & Jako administrator chcę dodawać, zmieniać i usuwać pokoje, aby oferta odpowiadała stanowi hotelu.
+   & S & \ref{f:pokoje} \\
+20 & Jako administrator chcę zarządzać typami pokoi i ich cenami, aby móc dostosowywać cennik.
+   & S & \ref{f:pokoje} \\
+21 & Jako administrator chcę zarządzać listą usług hotelowych i ich cenami, aby dostosowywać ofertę hotelu.
+   & W & \ref{f:uslugi} \\
+22 & Jako administrator chcę przeglądać raport przychodów w poszczególnych miesiącach, aby śledzić wyniki finansowe hotelu.
+   & S & \ref{f:przychody} \\
+23 & Jako administrator chcę przeglądać raport obłożenia według typu pokoju, aby wiedzieć, które pokoje cieszą się największym zainteresowaniem.
+   & S & \ref{f:oblozenie} \\
+24 & Jako administrator chcę przeglądać listę gości o najwyższych wydatkach, aby móc proponować im rabaty.
+   & C & \ref{f:najlepsigoscie} \\
+25 & Jako administrator chcę przeglądać listę rzadko rezerwowanych pokoi, aby zdecydować o zmianie ich ceny.
+   & C & \ref{f:rzadkie} \\
+26 & Jako administrator chcę wiedzieć, w których miesiącach przychód przekroczył średnią, aby planować promocje na słabsze miesiące.
+   & C & \ref{f:ponadsrednia} \\
+27 & Jako administrator chcę tworzyć i usuwać konta recepcjonistów, aby nowi pracownicy mieli dostęp do systemu.
+   & S & \ref{f:kontapracownikow} \\
+\bottomrule
+\end{longtable}
+
+Minimalny zakres działającego systemu (MVP) tworzą historyjki o priorytecie M:
+1, 2, 4, 6, 7, 9, 15 i 16. Pierwsze konto administratora tworzone jest
+w skrypcie z danymi początkowymi; kolejne konta pracowników zakłada
+administrator z poziomu aplikacji.
+
+\subsection{Wymagania funkcjonalne -- wersja podstawowa}
+\label{sec:wymagania}
+
+\subsubsection*{Gość}
+\begin{enumerate}[label=F\arabic*., ref=F\arabic*, series=wymagania]
+    \item Gość może utworzyć konto, podając imię, nazwisko, e-mail, telefon i hasło. \label{f:rejestracja}
+    \item Gość może zalogować się do systemu i wylogować z niego. \label{f:logowanie}
+    \item Gość może zmienić swoje dane kontaktowe. \label{f:zmianadanych}
+    \item Gość może wyszukiwać wolne pokoje w wybranym przez siebie terminie, z możliwością
+          filtrowania po typie pokoju i liczbie osób. \label{f:wolne}
+    \item Gość może zarezerwować jeden lub kilka wolnych pokoi na wybrany
+          termin. \label{f:rezerwacja}
+    \item Gość może przeglądać swoje rezerwacje wraz z ich kosztem,
+          sumą dokonanych wpłat i statusem płatności (brak wpłat,
+          opłacona częściowo, opłacona w całości). \label{f:status}
+    \item Gość może anulować swoją rezerwację przed datą rozpoczęcia pobytu o ile nie dokonano jeszcze żadnej wpłaty. \label{f:anulowanie}
+\end{enumerate}
+
+\subsubsection*{Recepcjonista}
+\begin{enumerate}[label=F\arabic*., ref=F\arabic*, resume=wymagania]
+    \item Recepcjonista może zalogować się do systemu i wylogować z niego. \label{f:logowanierecepcja}
+    \item Recepcjonista może przeglądać i edytować dane gości oraz
+          wszystkie rezerwacje. \label{f:danegosci}
+    \item Recepcjonista może księgować wpłaty za rezerwacje -- zaliczkę oraz dopłatę pozostałej należności. \label{f:wplaty}
+\end{enumerate}
+
+\subsubsection*{Administrator}
+\begin{enumerate}[label=F\arabic*., ref=F\arabic*, resume=wymagania]
+    \item Administrator może zalogować się do systemu i wylogować z niego. \label{f:logowanieadmin}
+    \item Administrator może tworzyć, edytować i usuwać konta recepcjonistów. \label{f:kontapracownikow}
+    \item Administrator może dodawać, edytować i usuwać pokoje oraz typy pokoi wraz z ich cenami. \label{f:pokoje}
+    \item Administrator może generować raport miesięcznych przychodów. \label{f:przychody}
+    \item Administrator może generować raport obłożenia pokoi według typu. \label{f:oblozenie}
+    \item Administrator może generować raport gości o najwyższych
+          wydatkach. \label{f:najlepsigoscie}
+
+    \item Administrator może generować raport pokoi rzadko rezerwowanych. \label{f:rzadkie}
+    \item Administrator może generować raport miesięcy, w których przychód przekroczył średnią miesięczną. \label{f:ponadsrednia}
+\end{enumerate}
+
+\subsubsection*{System}
+\begin{enumerate}[label=F\arabic*., ref=F\arabic*, resume=wymagania]
+    \item System uniemożliwia rezerwację pokoju zajętego w danym terminie. \label{f:kolizje}
+    \item System automatycznie wylicza koszt rezerwacji na podstawie liczby nocy i ceny pokoju w momencie rezerwacji. \label{f:koszt}
+    \item System odrzuca niepoprawne dane (np. data wymeldowania wcześniejsza niż data zameldowania, ujemna kwota płatności). \label{f:walidacja}
+    \item System uniemożliwia zaksięgowanie wpłaty przekraczającej
+    pozostałą należność za rezerwację. \label{f:nadplata}
+\end{enumerate}
+
+\subsection{Wymagania funkcjonalne -- wersja rozszerzona}
+\begin{enumerate}[label=F\arabic*., ref=F\arabic*, resume=wymagania]
+    \item Administrator może zarządzać listą usług hotelowych i ich cenami. \label{f:uslugi}
+    \item Gość może zarezerwować usługę na konkretny dzień i godzinę w trakcie swojego pobytu.. \label{f:rezerwacjauslugi}
+    \item Koszt zarezerwowanych usług jest doliczany do kosztu pobytu. \label{f:kosztuslug}
+\end{enumerate}
+
+\subsection{Wymagania niefunkcjonalne}
+\begin{itemize}
+    \item Technologie: baza danych PostgreSQL, aplikacja webowa (Node.js)
+    \item Bezpieczeństwo: podział na role, również na poziomie bazy danych, hashowanie haseł, tokeny logowania.
+    \item Automatyzacja: triggery w bazie danych.
+    \item Szybkość i wydajność: System sprawnie obsługuje duże zapytania dzięki indeksom.
+    \item Dostępność: aplikacja webowa ORAZ baza danych (obiekty w bazie) w \textbf{języku polskim.}
+\end{itemize}
+
+\section{Funkcje realizowane w bazie danych}
+
+\noindent Poniższa tabela przedstawia funkcje realizowane po stronie bazy danych.
+
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{4.5cm}
+                  >{\raggedright\arraybackslash}p{3cm}
+                  >{\raggedright\arraybackslash}p{5.5cm}
+                  p{1.5cm}}
+\toprule
+\textbf{Funkcja} & \textbf{Mechanizm} & \textbf{Opis} & \textbf{Wym.} \\
+\midrule
+\endhead
+
+\multicolumn{4}{l}{\textit{Wersja podstawowa}} \\
+\midrule
+Wykrywanie kolizji rezerwacji & ograniczenie \texttt{EXCLUDE}
+  & odrzuca rezerwację pokoju w terminie nakładającym się na inną
+  & \ref{f:kolizje} \\
+Wyszukiwanie wolnych pokoi & funkcja
+  & zwraca pokoje wolne w podanym terminie, z filtrem typu i liczby osób
+  & \ref{f:wolne} \\
+Kalendarz dostępności & widok
+  & pokoje z typem, ceną i terminami zajętości, bez danych osób
+    rezerwujących
+  & \ref{f:wolne} \\
+Wyliczanie kosztu rezerwacji & wyzwalacz, funkcja
+  & wyzwalacz kopiuje aktualną cenę pokoju do pozycji rezerwacji;
+    funkcja \texttt{koszt\_rezerwacji} liczy koszt pobytu na podstawie
+    liczby nocy i zapisanej ceny, wykorzystywana w widoku statusu
+    płatności i w blokadzie nadpłaty
+  & \ref{f:koszt} \\
+Walidacja danych & ograniczenia \texttt{CHECK}
+  & poprawność dat, kwot, cen, formatu e-mail i telefonu, rodzaju
+    płatności i roli pracownika
+  & \ref{f:walidacja} \\
+Blokada nadpłaty & wyzwalacz
+  & odrzuca wpłatę przekraczającą pozostałą należność
+  & \ref{f:nadplata} \\
+Blokada anulowania opłaconej rezerwacji & klucz obcy (\texttt{RESTRICT})
+  & uniemożliwia usunięcie rezerwacji, do której dokonano wpłaty
+  & \ref{f:anulowanie} \\
+  Blokada anulowania rozpoczętego pobytu & wyzwalacz
+  & uniemożliwia usunięcie rezerwacji, której pobyt już się rozpoczął
+  & \ref{f:anulowanie} \\
+Usuwanie pozycji anulowanej rezerwacji & klucz obcy (\texttt{CASCADE})
+  & usunięcie rezerwacji usuwa przypisane do niej pokoje
+  & \ref{f:anulowanie} \\
+Status płatności & widok, grupowanie
+  & koszt, suma wpłat, kwota do zapłaty i status (brak, częściowo,
+    w całości) dla każdej rezerwacji
+  & \ref{f:status}, \ref{f:danegosci} \\
+Raport przychodów & widok, grupowanie
+  & przychody zgrupowane według miesięcy
+  & \ref{f:przychody} \\
+Raport obłożenia & widok, grupowanie
+  & liczba zajętych nocy i procent obłożenia według typu pokoju
+  & \ref{f:oblozenie} \\
+Raport najlepszych gości & widok, grupowanie
+  & goście o łącznych wydatkach powyżej progu
+    (\texttt{HAVING} na \texttt{SUM})
+  & \ref{f:najlepsigoscie} \\
+Raport pokoi rzadko rezerwowanych & widok, grupowanie
+  & pokoje z liczbą rezerwacji poniżej progu
+    (\texttt{HAVING} na \texttt{COUNT})
+  & \ref{f:rzadkie} \\
+Raport miesięcy ponad średnią & widok, grupowanie, podzapytanie
+  & miesiące o przychodzie wyższym od średniej miesięcznej
+    (\texttt{HAVING} z podzapytaniem)
+  & \ref{f:ponadsrednia} \\
+Poziomy dostępu & widoki i uprawnienia
+  & osobne widoki dla gościa, recepcjonisty i administratora,
+    udostępniane poleceniem \texttt{GRANT}; prawo do widoku
+    nie daje dostępu do tabel bazowych
+  & \ref{f:rejestracja}--\ref{f:ponadsrednia} \\
+
+\midrule
+\multicolumn{4}{l}{\textit{Wersja rozszerzona}} \\
+\midrule
+Rezerwacja usługi w trakcie pobytu & wyzwalacz
+  & odrzuca rezerwację usługi poza terminem pobytu gościa
+  & \ref{f:rezerwacjauslugi} \\
+Doliczanie kosztu usług & wyzwalacz, widok
+  & wyzwalacz kopiuje aktualną cenę usługi do jej rezerwacji;
+    widok statusu płatności dolicza koszt usług do kosztu pobytu
+  & \ref{f:kosztuslug} \\
+\bottomrule
+\end{longtable}
+
+\section*{Część II: Projekt diagramów}
+\addcontentsline{toc}{section}{Część II: Projekt diagramów}
+
+\end{document}

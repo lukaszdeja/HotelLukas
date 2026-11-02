@@ -1,0 +1,36 @@
+-- kolizja: pokój 102 jest zajęty 10-13.11 (powinien być błąd)
+INSERT INTO rezerwacja_pokoj VALUES (2, 2, '2026-11-12', '2026-11-14', 350);
+
+ERROR:  conflicting key value violates exclusion constraint "rezerwacja_pokoj_kolizja"
+DETAIL:  Key (id_pokoju, daterange(data_od, data_do))=(2, [2026-11-12,2026-11-14)) conflicts with existing key (id_pokoju, daterange(data_od, data_do))=(2, [2026-11-10,2026-11-13)).
+
+--blokowanie dodania tego samego pokoju do tej samej rezerwacji
+
+INSERT INTO rezerwacja_pokoj VALUES (4, 2, '2026-11-12', '2026-11-14', 350);
+
+ERROR:  duplicate key value violates unique constraint "rezerwacja_pokoj_pk"
+DETAIL:  Key (id_rezerwacji, id_pokoju)=(4, 2) already exists.
+
+--tu brak kolizji bo wymeldowanie i zameldowanie w tym samym dniu
+
+INSERT INTO rezerwacja_pokoj VALUES (3, 2, '2026-11-13', '2026-11-15', 350);
+INSERT 0 1
+
+--blad: zla kolejność dat
+
+INSERT INTO rezerwacja_pokoj VALUES (2, 3, '2026-12-10', '2026-12-08', 350);
+
+ERROR:  new row for relation "rezerwacja_pokoj" violates check constraint "rezerwacja_pokoj_daty_chk"
+DETAIL:  Failing row contains (2, 3, 2026-12-10, 2026-12-08, 350.00).
+
+--blad: nie można anulować opłaconej rezerwacji
+DELETE FROM rezerwacja WHERE id_rezerwacji = 1;
+
+ERROR:  update or delete on table "rezerwacja" violates foreign key constraint "platnosc_rez_fk" on table "platnosc"
+DETAIL:  Key (id_rezerwacji)=(1) is still referenced from table "platnosc".
+
+--dla nieopłaconej przejdzie:
+DELETE FROM rezerwacja WHERE id_rezerwacji = 4;
+DELETE 1
+
+
