@@ -121,33 +121,6 @@ CREATE TABLE rezerwacja_usluga (
     CONSTRAINT rezerwacja_usluga_cena_chk  CHECK (cena >= 0)
 );
 
--- widoki
-
--- widok dla goscia - pokoje wolne w dniu dzisiejszym
-
-CREATE VIEW widok_wolne_pokoje AS
-SELECT p.numer, t.nazwa AS typ, t.liczba_osob, t.cena_za_noc
-FROM pokoj p JOIN typ_pokoju t ON t.id_typu = p.id_typu 
-WHERE NOT EXISTS (SELECT 1 FROM rezerwacja_pokoj rp WHERE rp.id_pokoju = p.id_pokoju AND CURRENT_DATE >= rp.data_od AND CURRENT_DATE <  rp.data_do);
-
--- widok platnosci dla recepcjonisty: widzi ile zaplacil gosc, ile brakuje jaki jest status, ulatwia ksiegowanie faktycznych platnosci
-
-CREATE VIEW widok_rezerwacje_platnosci AS
-SELECT r.id_rezerwacji, r.id_goscia, g.imie, g.nazwisko, r.data_utworzenia,
-       COALESCE(k.koszt, 0) AS koszt,
-       COALESCE(w.wplacono, 0) AS wplacono,
-       COALESCE(k.koszt, 0) - COALESCE(w.wplacono, 0) AS do_zaplaty,
-       CASE
-         WHEN COALESCE(w.wplacono, 0) = 0 THEN 'brak wpłat'
-         WHEN COALESCE(w.wplacono, 0) < COALESCE(k.koszt, 0) THEN 'opłacona częściowo'
-         ELSE 'opłacona w całości'
-       END AS status
-FROM rezerwacja r
-JOIN gosc g ON g.id_goscia = r.id_goscia
-LEFT JOIN (SELECT id_rezerwacji, SUM((data_do - data_od) * cena_za_noc) AS koszt FROM rezerwacja_pokoj GROUP BY id_rezerwacji) k
-       ON k.id_rezerwacji = r.id_rezerwacji
-LEFT JOIN (SELECT id_rezerwacji, SUM(kwota) AS wplacono FROM platnosc GROUP BY id_rezerwacji) w ON w.id_rezerwacji = r.id_rezerwacji;
-
 -- funkcje
 
 -- funkcja obliczająca koszt rezerwacji pokoju przy użyciu ceny zapisanej w momencie rezerwacji STABLE - tylko czyta tabele:
@@ -175,3 +148,42 @@ BEGIN
     RAISE NOTICE 'Zaksięgowano wpłatę nr %', id;
     RETURN id;
 END $$;
+
+-- funkcja obsługująca widok wolnych pokoi - dzięki parametrom można wyszukiwać wolne pokoje na konkretny dzień a nie tylko na dzisiaj
+
+CREATE OR REPLACE FUNCTION wolne_pokoje(p_od date, p_do date, p_id_typu integer DEFAULT NULL, p_liczba_osob integer DEFAULT NULL)
+RETURNS TABLE (numer varchar, typ varchar, liczba_osob smallint, cena_za_noc numeric) LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    IF p_do <= p_od THEN
+        RAISE EXCEPTION 'Data wymeldowania (%) musi być późniejsza niż data zameldowania (%)', p_do, p_od
+            USING HINT = 'Podaj daty tak żeby długość pobytu wynosiła co najmniej jedną noc';
+    END IF;
+    RETURN QUERY SELECT p.numer, t.nazwa, t.liczba_osob, t.cena_za_noc FROM pokoj p JOIN typ_pokoju t ON t.id_typu = p.id_typu
+    WHERE (p_id_typu IS NULL OR t.id_typu = p_id_typu) AND (p_liczba_osob IS NULL OR t.liczba_osob >= p_liczba_osob)
+    AND NOT EXISTS (SELECT 1 FROM rezerwacja_pokoj rp WHERE rp.id_pokoju = p.id_pokoju AND daterange(rp.data_od, rp.data_do) && daterange(p_od, p_do))
+    ORDER BY p.numer;
+END $$;
+
+-- widoki
+
+-- widok dla goscia - pokoje wolne w dniu dzisiejszym wykorzystuje funkcje wolne pokoje, która z kolei pozwala na wyszukanie wolnych pokoi w dowolnych terminach
+
+CREATE VIEW widok_wolne_pokoje_dzis AS
+SELECT * FROM wolne_pokoje(CURRENT_DATE, CURRENT_DATE + 1);
+
+-- widok platnosci dla recepcjonisty: widzi ile zaplacil gosc, ile brakuje jaki jest status, ulatwia ksiegowanie faktycznych platnosci
+
+CREATE VIEW widok_rezerwacje_platnosci AS
+SELECT r.id_rezerwacji, r.id_goscia, g.imie, g.nazwisko, r.data_utworzenia,
+       COALESCE(k.koszt, 0) AS koszt,
+       COALESCE(w.wplacono, 0) AS wplacono,
+       COALESCE(k.koszt, 0) - COALESCE(w.wplacono, 0) AS do_zaplaty,
+       CASE
+         WHEN COALESCE(w.wplacono, 0) = 0 THEN 'brak wpłat'
+         WHEN COALESCE(w.wplacono, 0) < COALESCE(k.koszt, 0) THEN 'opłacona częściowo'
+         ELSE 'opłacona w całości'
+       END AS status
+FROM rezerwacja r
+JOIN gosc g ON g.id_goscia = r.id_goscia
+LEFT JOIN (SELECT id_rezerwacji, SUM((data_do - data_od) * cena_za_noc) AS koszt FROM rezerwacja_pokoj GROUP BY id_rezerwacji) k ON k.id_rezerwacji = r.id_rezerwacji
+LEFT JOIN (SELECT id_rezerwacji, SUM(kwota) AS wplacono FROM platnosc GROUP BY id_rezerwacji) w ON w.id_rezerwacji = r.id_rezerwacji;
