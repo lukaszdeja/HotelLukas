@@ -128,7 +128,7 @@ CREATE TABLE rezerwacja_usluga (
 CREATE VIEW widok_wolne_pokoje AS
 SELECT p.numer, t.nazwa AS typ, t.liczba_osob, t.cena_za_noc
 FROM pokoj p JOIN typ_pokoju t ON t.id_typu = p.id_typu 
-WHERE NOT EXISTS (SELECT 1 FROM rezerwacja_pokoj rp WHERE rp.id_pokoju = p.id_pokoju AND CURRENT_DATE >= rp.data_od AND CURRENT_DATE <  rp.data_do)
+WHERE NOT EXISTS (SELECT 1 FROM rezerwacja_pokoj rp WHERE rp.id_pokoju = p.id_pokoju AND CURRENT_DATE >= rp.data_od AND CURRENT_DATE <  rp.data_do);
 
 -- widok platnosci dla recepcjonisty: widzi ile zaplacil gosc, ile brakuje jaki jest status, ulatwia ksiegowanie faktycznych platnosci
 
@@ -147,3 +147,31 @@ JOIN gosc g ON g.id_goscia = r.id_goscia
 LEFT JOIN (SELECT id_rezerwacji, SUM((data_do - data_od) * cena_za_noc) AS koszt FROM rezerwacja_pokoj GROUP BY id_rezerwacji) k
        ON k.id_rezerwacji = r.id_rezerwacji
 LEFT JOIN (SELECT id_rezerwacji, SUM(kwota) AS wplacono FROM platnosc GROUP BY id_rezerwacji) w ON w.id_rezerwacji = r.id_rezerwacji;
+
+-- funkcje
+
+-- funkcja obliczająca koszt rezerwacji pokoju przy użyciu ceny zapisanej w momencie rezerwacji STABLE - tylko czyta tabele:
+CREATE OR REPLACE FUNCTION koszt_rezerwacji(p_id_rezerwacji integer) RETURNS numeric LANGUAGE sql STABLE AS $$
+    SELECT COALESCE(SUM((data_do - data_od) * cena_za_noc), 0) FROM rezerwacja_pokoj WHERE id_rezerwacji = p_id_rezerwacji;
+$$;
+
+-- funkcja odpowiadająca za księgowanie wpłaty gościa, blokująca zbyt duże wpłaty przekraczające koszt
+CREATE OR REPLACE FUNCTION zaksieguj_wplate(p_id_rezerwacji integer, p_id_pracownika integer, p_kwota numeric, p_rodzaj varchar) RETURNS integer LANGUAGE plpgsql AS $$
+DECLARE
+    koszt numeric;
+    wplacono numeric;
+    id integer;
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM rezerwacja WHERE id_rezerwacji = p_id_rezerwacji) THEN
+        RAISE EXCEPTION 'Rezerwacja % nie istnieje', p_id_rezerwacji;
+    END IF;
+    koszt := koszt_rezerwacji(p_id_rezerwacji);
+    SELECT COALESCE(SUM(kwota), 0) INTO wplacono FROM platnosc WHERE id_rezerwacji = p_id_rezerwacji;
+    IF wplacono + p_kwota > koszt THEN
+        RAISE EXCEPTION 'Wpłata % zł przekracza pozostałą kwotę dopłaty za rezerwację % (pozostało % zł)', p_kwota, p_id_rezerwacji, koszt - wplacono
+            USING HINT = 'Zaksięguj kwotę nie większą niż pozostała kwota dopłaty.';
+    END IF;
+    INSERT INTO platnosc (id_rezerwacji, id_pracownika, kwota, rodzaj) VALUES (p_id_rezerwacji, p_id_pracownika, p_kwota, p_rodzaj) RETURNING id_platnosci INTO id;
+    RAISE NOTICE 'Zaksięgowano wpłatę nr %', id;
+    RETURN id;
+END $$;
