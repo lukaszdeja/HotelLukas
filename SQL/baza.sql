@@ -121,14 +121,21 @@ CREATE TABLE rezerwacja_usluga (
     CONSTRAINT rezerwacja_usluga_cena_chk  CHECK (cena >= 0)
 );
 
+-- indeksy
+
+CREATE INDEX rezerwacja_gosc_idx ON rezerwacja (id_goscia);
+CREATE INDEX platnosc_rezerwacja_idx ON platnosc (id_rezerwacji);
+CREATE INDEX platnosc_data_idx ON platnosc (data_wplaty);
+CREATE INDEX pokoj_typ_idx ON pokoj (id_typu);
+
 -- funkcje
 
--- funkcja obliczająca koszt rezerwacji pokoju przy użyciu ceny zapisanej w momencie rezerwacji STABLE - tylko czyta tabele:
+-- funkcja obliczajaca koszt rezerwacji pokoju przy uzyciu ceny zapisanej w momencie rezerwacji STABLE - tylko czyta tabele:
 CREATE OR REPLACE FUNCTION koszt_rezerwacji(p_id_rezerwacji integer) RETURNS numeric LANGUAGE sql STABLE AS $$
     SELECT COALESCE(SUM((data_do - data_od) * cena_za_noc), 0) FROM rezerwacja_pokoj WHERE id_rezerwacji = p_id_rezerwacji;
 $$;
 
--- funkcja odpowiadająca za księgowanie wpłaty gościa, blokująca zbyt duże wpłaty przekraczające koszt
+-- funkcja odpowiadajaca za ksiegowanie wplaty goscia, blokujaca zbyt duze wplaty przekraczajace koszt
 CREATE OR REPLACE FUNCTION zaksieguj_wplate(p_id_rezerwacji integer, p_id_pracownika integer, p_kwota numeric, p_rodzaj varchar) RETURNS integer LANGUAGE plpgsql AS $$
 DECLARE
     koszt numeric;

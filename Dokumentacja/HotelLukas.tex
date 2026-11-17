@@ -61,6 +61,7 @@
            {Ń}{{\'N}}1 {Ó}{{\'O}}1 {Ś}{{\'S}}1 {Ź}{{\'Z}}1 {Ż}{{\.Z}}1
 }
 \renewcommand{\lstlistingname}{Listing}
+\newcommand{\us}{\_\allowbreak}
 
 
 \usepackage[hidelinks]{hyperref}
@@ -88,22 +89,24 @@
 
   \vspace*{\fill}
 \end{titlepage}
+\tableofcontents
+\newpage
 
 \section*{Część I: Projekt koncepcji i założenia}
 \addcontentsline{toc}{section}{Część I: Projekt koncepcji i założenia}
 
 \section{Temat projektu}
 
-\noindent Projekt realizuje system zarządzania hotelem. Jego celem jest umożliwienie rezerwacji pokoi hotelowych przez gości, wykrywanie kolizji przy rezerwacjach. Dodatkowo umożliwia generowanie i przeglądanie raportów z przychodów dla administratorów. W wersji rozszerzonej umożliwia także rezerwacje usług dodatkowych. Relacyjna baza danych PostgreSQL a także aplikacja webowa obsługują podział na role użytkowników.
+\noindent Projekt realizuje system zarządzania hotelem. Jego celem jest umożliwienie rezerwacji pokoi hotelowych przez gości oraz wykrywanie kolizji przy rezerwacjach. Dodatkowo umożliwia generowanie i przeglądanie raportów z przychodów dla administratorów. W wersji rozszerzonej umożliwia także rezerwacje usług dodatkowych. Relacyjna baza danych PostgreSQL, a także aplikacja webowa obsługują podział na role użytkowników.
 
 Zadania systemu:
 \begin{itemize}
-    \item Rejestracja konta i logowanie.
-    \item Rezerwacje pokojów oraz przechowywanie w bazie danych informacji o gościach oraz pokojach.
-    \item Rejestrowanie płatności (bez faktycznego transferu środków, tylko wpis w bazie).
-    \item Generowanie raportów - obłożenia pokoi, miesięcznych przychodów
-    \item Podział na role - gość, recepcjonista i administrator
-    \item \textbf{W wersji rozszerzonej: } system usług hotelowych (sauna, basen), rezerwacje usług
+    \item rejestracja konta i logowanie,
+    \item rezerwacje pokoi oraz przechowywanie w bazie danych informacji o gościach i pokojach,
+    \item rejestrowanie płatności (bez faktycznego transferu środków, tylko wpis w bazie),
+    \item generowanie raportów: popularności typów pokoi, miesięcznych przychodów,
+    \item podział na role: gość, recepcjonista i administrator,
+    \item \textbf{w wersji rozszerzonej}: system usług hotelowych (sauna, basen), rezerwacje usług.
 \end{itemize}
 
 \section{Analiza wymagań użytkownika}
@@ -179,7 +182,7 @@ daną historyjkę.
    & W & \ref{f:uslugi} \\
 22 & Jako administrator chcę przeglądać raport przychodów w poszczególnych miesiącach, aby śledzić wyniki finansowe hotelu.
    & S & \ref{f:przychody} \\
-23 & Jako administrator chcę przeglądać raport obłożenia według typu pokoju, aby wiedzieć, które pokoje cieszą się największym zainteresowaniem.
+23 & Jako administrator chcę przeglądać raport popularności typów pokoi, aby wiedzieć, które pokoje cieszą się największym zainteresowaniem.
    & S & \ref{f:oblozenie} \\
 24 & Jako administrator chcę przeglądać listę gości o najwyższych wydatkach, aby móc proponować im rabaty.
    & C & \ref{f:najlepsigoscie} \\
@@ -229,7 +232,7 @@ administrator z poziomu aplikacji.
     \item Administrator może tworzyć, edytować i usuwać konta recepcjonistów. \label{f:kontapracownikow}
     \item Administrator może dodawać, edytować i usuwać pokoje oraz typy pokoi wraz z ich cenami. \label{f:pokoje}
     \item Administrator może generować raport miesięcznych przychodów. \label{f:przychody}
-    \item Administrator może generować raport obłożenia pokoi według typu. \label{f:oblozenie}
+    \item Administrator może generować raport popularności typów pokoi. \label{f:oblozenie}
     \item Administrator może generować raport gości o najwyższych
           wydatkach. \label{f:najlepsigoscie}
 
@@ -249,23 +252,22 @@ administrator z poziomu aplikacji.
 \subsection{Wymagania funkcjonalne -- wersja rozszerzona}
 \begin{enumerate}[label=F\arabic*., ref=F\arabic*, resume=wymagania]
     \item Administrator może zarządzać listą usług hotelowych i ich cenami. \label{f:uslugi}
-    \item Gość może zarezerwować usługę na konkretny dzień i godzinę w trakcie swojego pobytu.. \label{f:rezerwacjauslugi}
+    \item Gość może zarezerwować usługę na konkretny dzień i godzinę w trakcie swojego pobytu. \label{f:rezerwacjauslugi}
     \item Koszt zarezerwowanych usług jest doliczany do kosztu pobytu. \label{f:kosztuslug}
 \end{enumerate}
 
 \subsection{Wymagania niefunkcjonalne}
 \begin{itemize}
-    \item Technologie: baza danych PostgreSQL, aplikacja webowa (Node.js)
+    \item Technologie: baza danych PostgreSQL, aplikacja webowa (Node.js + React)
     \item Bezpieczeństwo: podział na role, również na poziomie bazy danych, hashowanie haseł, tokeny logowania.
-    \item Automatyzacja: triggery w bazie danych.
-    \item Szybkość i wydajność: System sprawnie obsługuje duże zapytania dzięki indeksom.
-    \item Dostępność: aplikacja webowa ORAZ baza danych (obiekty w bazie) w \textbf{języku polskim.}
+    \item Automatyzacja: wyzwalacze w bazie danych.
+    \item Szybkość i wydajność: System sprawnie obsługuje duże zapytania dzięki indeksom - indeksy na kluczach obcych i dacie wpłaty, wykorzystywane w złączeniach i raportach.
+    \item Język: interfejs aplikacji oraz nazwy obiektów bazy danych w języku polskim.
 \end{itemize}
 
 \section{Funkcje realizowane w bazie danych}
 
 \noindent Poniższa tabela przedstawia funkcje realizowane po stronie bazy danych.
-
 
 \begin{longtable}{>{\raggedright\arraybackslash}p{4.5cm}
                   >{\raggedright\arraybackslash}p{3cm}
@@ -276,62 +278,87 @@ administrator z poziomu aplikacji.
 \midrule
 \endhead
 
-\multicolumn{4}{l}{\textit{Wersja podstawowa}} \\
+\multicolumn{4}{l}{\textit{Wersja podstawowa -- rezerwacje}} \\
 \midrule
 Wykrywanie kolizji rezerwacji & ograniczenie \texttt{EXCLUDE}
-  & odrzuca rezerwację pokoju w terminie nakładającym się na inną
+  & \texttt{rezerwacja\us pokoj\us kolizja}: odrzuca rezerwację pokoju
+    w terminie nakładającym się na inną (zakresy dat, indeks GiST)
   & \ref{f:kolizje} \\
 Wyszukiwanie wolnych pokoi & funkcja
-  & zwraca pokoje wolne w podanym terminie, z filtrem typu i liczby osób
+  & \texttt{wolne\us pokoje}: zwraca pokoje wolne w podanym terminie,
+    z opcjonalnym filtrem typu i liczby osób; odrzuca termin, w którym
+    data wymeldowania nie jest późniejsza od daty zameldowania
   & \ref{f:wolne} \\
-   Wolne pokoje na dziś & widok, podzapytanie
-     & pokoje wolne w bieżącym dniu z typem, liczbą osób i ceną,
-       bez danych osób rezerwujących i płatności
-     & \ref{f:wolne} \\
+Wolne pokoje na dziś & widok, funkcja
+  & \texttt{widok\us wolne\us pokoje\us dzis}: pokoje wolne w bieżącym
+    dniu, wyznaczane funkcją \texttt{wolne\us pokoje}; bez danych osób
+    rezerwujących i płatności
+  & \ref{f:wolne} \\
 Wyliczanie kosztu rezerwacji & wyzwalacz, funkcja
   & wyzwalacz kopiuje aktualną cenę pokoju do pozycji rezerwacji;
-    funkcja \texttt{koszt\_rezerwacji} liczy koszt pobytu na podstawie
-    liczby nocy i zapisanej ceny, wykorzystywana w widoku statusu
-    płatności i w blokadzie nadpłaty
+    funkcja \texttt{koszt\us rezerwacji} liczy koszt pobytu na podstawie
+    liczby nocy i zapisanej ceny
   & \ref{f:koszt} \\
-Walidacja danych & ograniczenia \texttt{CHECK}
-  & poprawność dat, kwot, cen, formatu e-mail i telefonu, rodzaju
-    płatności i roli pracownika
-  & \ref{f:walidacja} \\
-Blokada nadpłaty & wyzwalacz
-  & odrzuca wpłatę przekraczającą pozostałą należność
-  & \ref{f:nadplata} \\
 Blokada anulowania opłaconej rezerwacji & klucz obcy (\texttt{RESTRICT})
-  & uniemożliwia usunięcie rezerwacji, do której dokonano wpłaty
+  & \texttt{platnosc\us rez\us fk}: uniemożliwia usunięcie rezerwacji,
+    do której dokonano wpłaty
   & \ref{f:anulowanie} \\
-  Blokada anulowania rozpoczętego pobytu & wyzwalacz
+Blokada anulowania rozpoczętego pobytu & wyzwalacz
   & uniemożliwia usunięcie rezerwacji, której pobyt już się rozpoczął
   & \ref{f:anulowanie} \\
 Usuwanie pozycji anulowanej rezerwacji & klucz obcy (\texttt{CASCADE})
-  & usunięcie rezerwacji usuwa przypisane do niej pokoje
+  & usunięcie rezerwacji usuwa przypisane do niej pokoje i usługi
   & \ref{f:anulowanie} \\
+\midrule
+\multicolumn{4}{l}{\textit{Wersja podstawowa -- płatności}} \\
+\midrule
+Księgowanie wpłat i blokada nadpłaty & funkcja, wyzwalacz
+  & \texttt{zaksieguj\us wplate}: księguje zaliczkę lub dopłatę i odrzuca
+    kwotę przekraczającą pozostałą należność; wyzwalacz stosuje tę samą
+    regułę przy bezpośrednim wstawieniu wiersza do tabeli
+  & \ref{f:wplaty}, \ref{f:nadplata} \\
 Status płatności & widok, grupowanie
-  & koszt, suma wpłat, kwota do zapłaty i status (brak, częściowo,
-    w całości) dla każdej rezerwacji
+  & \texttt{widok\us rezerwacje\us platnosci}: koszt, suma wpłat, kwota
+    do zapłaty i status (brak wpłat, częściowo, w całości) dla każdej
+    rezerwacji
   & \ref{f:status}, \ref{f:danegosci} \\
+\midrule
+\multicolumn{4}{l}{\textit{Wersja podstawowa -- raporty}} \\
+\midrule
 Raport przychodów & widok, grupowanie
-  & przychody zgrupowane według miesięcy
+  & \texttt{widok\us przychody}: liczba i suma wpłat w kolejnych
+    miesiącach, według daty wpłaty
   & \ref{f:przychody} \\
-Raport obłożenia & widok, grupowanie
-  & liczba zajętych nocy i procent obłożenia według typu pokoju
+Raport popularności typów pokoi & widok, grupowanie
+  & \texttt{widok\us popularnosci\us pokojow}: liczba pokoi, rezerwacji
+    i zarezerwowanych nocy według typu pokoju
   & \ref{f:oblozenie} \\
 Raport najlepszych gości & widok, grupowanie
-  & goście o łącznych wydatkach powyżej progu
-    (\texttt{HAVING} na \texttt{SUM})
+  & \texttt{widok\us najlepszych\us gosci}: goście, których łączne
+    wpłaty przekraczają próg (\texttt{HAVING} na \texttt{SUM})
   & \ref{f:najlepsigoscie} \\
 Raport pokoi rzadko rezerwowanych & widok, grupowanie
-  & pokoje z liczbą rezerwacji poniżej progu
-    (\texttt{HAVING} na \texttt{COUNT})
+  & \texttt{widok\us rzadkie\us pokoje}: pokoje z liczbą rezerwacji
+    poniżej progu (\texttt{HAVING} na \texttt{COUNT})
   & \ref{f:rzadkie} \\
 Raport miesięcy ponad średnią & widok, grupowanie, podzapytanie
-  & miesiące o przychodzie wyższym od średniej miesięcznej
+  & \texttt{widok\us miesiace\us ponad\us srednia}: miesiące
+    o przychodzie wyższym od średniej miesięcznej
     (\texttt{HAVING} z podzapytaniem)
   & \ref{f:ponadsrednia} \\
+\midrule
+\multicolumn{4}{l}{\textit{Wersja podstawowa -- walidacja i dostęp}} \\
+\midrule
+Walidacja danych & ograniczenia \texttt{CHECK}, \texttt{NOT NULL},
+                   \texttt{UNIQUE}
+  & poprawność dat, kwot, cen, formatu e-mail i telefonu, rodzaju
+    płatności i roli pracownika; unikalność adresu e-mail, loginu,
+    numeru pokoju
+  & \ref{f:walidacja} \\
+Wydajność zapytań & indeksy
+  & indeksy na kluczach obcych i dacie wpłaty, wykorzystywane
+    w złączeniach i raportach
+  & -- \\
 Poziomy dostępu & widoki i uprawnienia
   & osobne widoki dla gościa, recepcjonisty i administratora,
     udostępniane poleceniem \texttt{GRANT}; prawo do widoku
@@ -339,19 +366,109 @@ Poziomy dostępu & widoki i uprawnienia
   & \ref{f:rejestracja}--\ref{f:ponadsrednia} \\
 
 \midrule
-\multicolumn{4}{l}{\textit{Wersja rozszerzona}} \\
+\multicolumn{4}{l}{\textit{Wersja rozszerzona -- usługi}} \\
 \midrule
-Rezerwacja usługi w trakcie pobytu & wyzwalacz
-  & odrzuca rezerwację usługi poza terminem pobytu gościa
+Rezerwacja usługi w trakcie pobytu & funkcja, wyzwalacz
+  & funkcja \texttt{zarezerwuj\us usluge} rezerwuje usługę na podany
+    termin; wyzwalacz odrzuca rezerwację usługi poza terminem pobytu
+    gościa
   & \ref{f:rezerwacjauslugi} \\
-Doliczanie kosztu usług & wyzwalacz, widok
-  & wyzwalacz kopiuje aktualną cenę usługi do jej rezerwacji;
-    widok statusu płatności dolicza koszt usług do kosztu pobytu
+Doliczanie kosztu usług & wyzwalacz, funkcja, widok
+  & wyzwalacz kopiuje aktualną cenę usługi do jej rezerwacji; funkcja
+    \texttt{koszt\us uslug} sumuje koszt usług, a widok statusu płatności
+    dolicza go do kosztu pobytu
   & \ref{f:kosztuslug} \\
 \bottomrule
 \end{longtable}
 
 \section*{Część II: Projekt diagramów}
 \addcontentsline{toc}{section}{Część II: Projekt diagramów}
+
+\section{Diagram przepływu danych}
+
+
+\section{Encje i ich atrybuty}
+
+
+\section{Związki między encjami i diagram ERD}
+
+\noindent Na rysunku \ref{fig:erd} poniżej przedstawiono diagram ERD bazy danych.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{erd}
+  \caption{Diagram ERD bazy danych}
+  \label{fig:erd}
+\end{figure}
+
+Związki między encjami:
+\begin{itemize}
+    \item \texttt{typ\us pokoju} -- \texttt{pokoj} (1:N): każdy pokój ma jeden typ,
+          jeden typ może mieć wiele pokoi,
+    \item \texttt{gosc} -- \texttt{rezerwacja} (1:N): gość może złożyć wiele rezerwacji,
+          każda rezerwacja należy do jednego gościa,
+    \item \texttt{rezerwacja} -- \texttt{pokoj} (N:M, przez \texttt{rezerwacja\us pokoj}):
+          rezerwacja może obejmować wiele pokoi, pokój może być rezerwowany
+          wielokrotnie w różnych terminach,
+    \item \texttt{rezerwacja} -- \texttt{platnosc} (1:N): do rezerwacji można
+          zaksięgować wiele wpłat (zaliczkę i dopłatę),
+    \item \texttt{pracownik} -- \texttt{platnosc} (1:N): pracownik może zaksięgować
+          wiele wpłat, każda wpłata ma jednego księgującego,
+    \item \texttt{rezerwacja} -- \texttt{usluga} (N:M, przez \texttt{rezerwacja\us usluga}):
+          w ramach rezerwacji można zarezerwować wiele usług, usługa może być
+          rezerwowana wielokrotnie (wersja rozszerzona).
+\end{itemize}
+
+
+\section*{Część III: Projekt logiczny}
+\addcontentsline{toc}{section}{Część III: Projekt logiczny}
+
+\section{Tabele, klucze i indeksy}
+
+\section{Słownik danych}
+
+\section{Zależności funkcyjne i normalizacja}
+
+\noindent Schemat sprawdzono pod kątem trzech pierwszych postaci normalnych.
+
+\begin{itemize}
+    \item \textbf{1NF} -- spełniona: wszystkie kolumny przechowują wartości
+          atomowe, brak powtarzających się grup kolumn.
+    \item \textbf{2NF} -- spełniona: jedyny złożony klucz główny to
+          (\texttt{id\us rezerwacji}, \texttt{id\us pokoju}) w tabeli
+          \texttt{rezerwacja\us pokoj}. Kolumny \texttt{data\us od},
+          \texttt{data\us do} i \texttt{cena\us za\us noc} opisują dany pokój
+          w danej rezerwacji, więc zależą od całego klucza, a nie od jego części. W pozostałych tabelach klucze główne są pojedynczymi kolumnami.
+    \item \textbf{3NF} -- spełniona z jednym świadomym wyjątkiem: kolumna
+          \texttt{rezerwacja\us pokoj.cena\us za\us noc} może wyglądać na zależną
+          przechodnio od klucza
+          (\texttt{id\us pokoju} $\rightarrow$ \texttt{id\us typu} $\rightarrow$
+          \texttt{typ\us pokoju.cena\us za\us noc}); analogicznie
+          \texttt{rezerwacja\us usluga.cena}
+          (\texttt{id\us uslugi} $\rightarrow$ \texttt{usluga.cena}).
+          Kolumny te przechowują jednak cenę z chwili rezerwacji, a nie cenę
+          aktualną, więc nie wynikają z bieżącej zawartości cennika.
+          Uzasadnienie opisano w punkcie \ref{sec:denormalizacja}.
+\end{itemize}
+
+
+\section{Denormalizacja}
+\label{sec:denormalizacja}
+
+\noindent Świadomie zdenormalizowano dwie kolumny przechowujące cenę z chwili
+rezerwacji:
+\begin{itemize}
+    \item \texttt{rezerwacja\us pokoj.cena\us za\us noc} -- kopia ceny z tabeli
+          \texttt{typ\us pokoju},
+    \item \texttt{rezerwacja\us usluga.cena} -- kopia ceny z tabeli
+          \texttt{usluga} (wersja rozszerzona).
+\end{itemize}
+
+\noindent Gdyby koszt rezerwacji liczyć zawsze z aktualnego cennika, zmiana ceny przez
+administratora zmieniałaby koszt rezerwacji złożonych wcześniej, a także
+przychody z poprzednich miesięcy prezentowane w raportach. Przechowanie ceny
+w momencie rezerwacji zachowuje dane archiwalne w niezmienionej postaci.
+
+\section{Operacje na danych}
 
 \end{document}
