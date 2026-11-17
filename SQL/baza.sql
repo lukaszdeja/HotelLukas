@@ -185,7 +185,7 @@ FROM rezerwacja r JOIN gosc g ON g.id_goscia = r.id_goscia
 LEFT JOIN (SELECT id_rezerwacji, SUM((data_do - data_od) * cena_za_noc) AS koszt FROM rezerwacja_pokoj GROUP BY id_rezerwacji) k ON k.id_rezerwacji = r.id_rezerwacji
 LEFT JOIN (SELECT id_rezerwacji, SUM(kwota) AS wplacono FROM platnosc GROUP BY id_rezerwacji) w ON w.id_rezerwacji = r.id_rezerwacji;
 
--- widok przychodow w danych miesiącach - do raportów administratora
+-- widok przychodow w danych miesiacach - do raportow administratora
 CREATE VIEW widok_przychody AS 
 SELECT date_trunc('month', data_wplaty)::date AS miesiac, 
         COUNT(*) AS liczba_wplat, SUM(kwota) AS przychody 
@@ -198,3 +198,33 @@ SELECT t.nazwa AS typ, COUNT(DISTINCT p.id_pokoju) AS liczba_pokojow,
 FROM typ_pokoju t LEFT JOIN pokoj p ON t.id_typu = p.id_typu
 LEFT JOIN rezerwacja_pokoj rp ON p.id_pokoju = rp.id_pokoju
 GROUP BY t.id_typu, typ ORDER BY zajete_noce DESC, liczba_rezerwacji DESC;
+
+-- widok najlepszych gosci do raportow administratora (wydatki powyzej ustalonego progu)
+CREATE VIEW widok_najlepszych_gosci AS 
+SELECT g.id_goscia, g.imie, g.nazwisko,
+        COUNT(DISTINCT r.id_rezerwacji) AS liczba_rezerwacji,
+        SUM(pl.kwota) AS suma_wplat
+FROM gosc g JOIN rezerwacja r ON g.id_goscia = r.id_goscia
+JOIN platnosc pl ON r.id_rezerwacji = pl.id_rezerwacji
+GROUP BY g.id_goscia, g.imie, g.nazwisko HAVING SUM(pl.kwota) > 1000
+ORDER BY suma_wplat DESC, liczba_rezerwacji DESC;
+
+-- widok najrzadziej rezerwowanych pokojow do raportow administratora
+CREATE VIEW widok_rzadkie_pokoje AS
+SELECT p.numer, t.nazwa AS typ, COUNT(rp.id_rezerwacji) AS liczba_rezerwacji
+FROM typ_pokoju t JOIN pokoj p ON t.id_typu = p.id_typu 
+LEFT JOIN rezerwacja_pokoj rp ON p.id_pokoju = rp.id_pokoju
+GROUP BY p.id_pokoju, p.numer, t.nazwa HAVING COUNT(rp.id_rezerwacji) < 2
+ORDER BY liczba_rezerwacji, p.numer;
+
+-- widok miesiecy z zarobkami powyzej sredniej - raport administratora
+CREATE VIEW widok_miesiace_ponad_srednia AS
+SELECT date_trunc('month', data_wplaty)::date AS miesiac,
+        SUM(kwota) AS przychod
+FROM platnosc GROUP BY date_trunc('month', data_wplaty)
+HAVING SUM(kwota) > (
+        SELECT AVG(suma) FROM (
+            SELECT SUM(kwota) AS suma
+            FROM platnosc
+            GROUP BY date_trunc('month', data_wplaty)) s
+) ORDER BY miesiac;

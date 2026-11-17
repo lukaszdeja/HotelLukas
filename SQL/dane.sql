@@ -22,3 +22,10 @@ INSERT INTO platnosc (id_rezerwacji, id_pracownika, kwota, data_wplaty, rodzaj) 
   (2, 1, 200, '2026-10-12', 'zaliczka'), (3, 1, 500, '2026-10-18', 'zaliczka');
 
 INSERT INTO usluga (nazwa, cena) VALUES ('sauna', 50), ('basen', 30), ('kręgielnia', 80);
+
+INSERT INTO rezerwacja (id_goscia, data_utworzenia) VALUES (2, '2026-08-05'), (3, '2026-09-12');
+
+INSERT INTO rezerwacja_pokoj VALUES (5, 3, '2026-08-20', '2026-08-25', 350), (6, 4, '2026-09-20', '2026-09-22', 200);
+
+INSERT INTO platnosc (id_rezerwacji, id_pracownika, kwota, data_wplaty, rodzaj) VALUES (5, 1,  500, '2026-08-05', 'zaliczka'),
+  (5, 1, 1250, '2026-08-20', 'doplata'), (6, 1,  400, '2026-09-12', 'zaliczka');
