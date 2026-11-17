@@ -149,7 +149,7 @@ BEGIN
     RETURN id;
 END $$;
 
--- funkcja obsługująca widok wolnych pokoi - dzięki parametrom można wyszukiwać wolne pokoje na konkretny dzień a nie tylko na dzisiaj
+-- funkcja obslugujaca widok wolnych pokojow - dzieki parametrom mozna wyszukiwac wolne pokoje na konkretny dzien a nie tylko na dzisiaj
 
 CREATE OR REPLACE FUNCTION wolne_pokoje(p_od date, p_do date, p_id_typu integer DEFAULT NULL, p_liczba_osob integer DEFAULT NULL)
 RETURNS TABLE (numer varchar, typ varchar, liczba_osob smallint, cena_za_noc numeric) LANGUAGE plpgsql STABLE AS $$
@@ -166,7 +166,7 @@ END $$;
 
 -- widoki
 
--- widok dla goscia - pokoje wolne w dniu dzisiejszym wykorzystuje funkcje wolne pokoje, która z kolei pozwala na wyszukanie wolnych pokoi w dowolnych terminach
+-- widok dla goscia - pokoje wolne w dniu dzisiejszym wykorzystuje funkcje wolne pokoje, ktora z kolei pozwala na wyszukanie wolnych pokojow w dowolnych terminach
 
 CREATE VIEW widok_wolne_pokoje_dzis AS
 SELECT * FROM wolne_pokoje(CURRENT_DATE, CURRENT_DATE + 1);
@@ -175,15 +175,26 @@ SELECT * FROM wolne_pokoje(CURRENT_DATE, CURRENT_DATE + 1);
 
 CREATE VIEW widok_rezerwacje_platnosci AS
 SELECT r.id_rezerwacji, r.id_goscia, g.imie, g.nazwisko, r.data_utworzenia,
-       COALESCE(k.koszt, 0) AS koszt,
-       COALESCE(w.wplacono, 0) AS wplacono,
-       COALESCE(k.koszt, 0) - COALESCE(w.wplacono, 0) AS do_zaplaty,
-       CASE
-         WHEN COALESCE(w.wplacono, 0) = 0 THEN 'brak wpłat'
-         WHEN COALESCE(w.wplacono, 0) < COALESCE(k.koszt, 0) THEN 'opłacona częściowo'
-         ELSE 'opłacona w całości'
-       END AS status
-FROM rezerwacja r
-JOIN gosc g ON g.id_goscia = r.id_goscia
+        COALESCE(k.koszt, 0) AS koszt, COALESCE(w.wplacono, 0) AS wplacono, COALESCE(k.koszt, 0) - COALESCE(w.wplacono, 0) AS do_zaplaty,
+        CASE
+          WHEN COALESCE(w.wplacono, 0) = 0 THEN 'brak wpłat'
+          WHEN COALESCE(w.wplacono, 0) < COALESCE(k.koszt, 0) THEN 'opłacona częściowo'
+          ELSE 'opłacona w całości'
+        END AS status
+FROM rezerwacja r JOIN gosc g ON g.id_goscia = r.id_goscia
 LEFT JOIN (SELECT id_rezerwacji, SUM((data_do - data_od) * cena_za_noc) AS koszt FROM rezerwacja_pokoj GROUP BY id_rezerwacji) k ON k.id_rezerwacji = r.id_rezerwacji
 LEFT JOIN (SELECT id_rezerwacji, SUM(kwota) AS wplacono FROM platnosc GROUP BY id_rezerwacji) w ON w.id_rezerwacji = r.id_rezerwacji;
+
+-- widok przychodow w danych miesiącach - do raportów administratora
+CREATE VIEW widok_przychody AS 
+SELECT date_trunc('month', data_wplaty)::date AS miesiac, 
+        COUNT(*) AS liczba_wplat, SUM(kwota) AS przychody 
+FROM platnosc GROUP BY miesiac ORDER BY miesiac;
+
+-- widok popularnosci (ilosc rezerwacji) pokoju wzgledem typu
+CREATE VIEW widok_popularnosci_pokojow AS
+SELECT t.nazwa AS typ, COUNT(DISTINCT p.id_pokoju) AS liczba_pokojow,
+        COUNT(rp.id_pokoju) AS liczba_rezerwacji, COALESCE(SUM(rp.data_do - rp.data_od), 0) AS zajete_noce
+FROM typ_pokoju t LEFT JOIN pokoj p ON t.id_typu = p.id_typu
+LEFT JOIN rezerwacja_pokoj rp ON p.id_pokoju = rp.id_pokoju
+GROUP BY t.id_typu, typ ORDER BY zajete_noce DESC, liczba_rezerwacji DESC;
