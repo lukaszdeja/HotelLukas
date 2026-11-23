@@ -147,14 +147,10 @@ BEGIN
     END IF;
     koszt := koszt_rezerwacji(p_id_rezerwacji);
     SELECT COALESCE(SUM(kwota), 0) INTO wplacono FROM platnosc WHERE id_rezerwacji = p_id_rezerwacji;
-    IF wplacono + p_kwota > koszt THEN
-        RAISE EXCEPTION 'Wpłata % zł przekracza pozostałą kwotę dopłaty za rezerwację % (pozostało % zł)', p_kwota, p_id_rezerwacji, koszt - wplacono
-            USING HINT = 'Zaksięguj kwotę nie większą niż pozostała kwota dopłaty.';
-    END IF;
     INSERT INTO platnosc (id_rezerwacji, id_pracownika, kwota, rodzaj) VALUES (p_id_rezerwacji, p_id_pracownika, p_kwota, p_rodzaj) RETURNING id_platnosci INTO id;
     RAISE NOTICE 'Zaksięgowano wpłatę nr %', id;
     RETURN id;
-END $$;
+END; $$;
 
 -- funkcja obslugujaca widok wolnych pokojow - dzieki parametrom mozna wyszukiwac wolne pokoje na konkretny dzien a nie tylko na dzisiaj
 
@@ -169,7 +165,30 @@ BEGIN
     WHERE (p_id_typu IS NULL OR t.id_typu = p_id_typu) AND (p_liczba_osob IS NULL OR t.liczba_osob >= p_liczba_osob)
     AND NOT EXISTS (SELECT 1 FROM rezerwacja_pokoj rp WHERE rp.id_pokoju = p.id_pokoju AND daterange(rp.data_od, rp.data_do) && daterange(p_od, p_do))
     ORDER BY p.numer;
-END $$;
+END; $$;
+
+-- wyzwalacze
+
+-- funkcja + wyzwalacz blokujace wplaty przekraczajace brakujaca naleznosc
+
+CREATE OR REPLACE FUNCTION blokuj_nadplate() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    koszt numeric;
+    wplacono numeric;
+BEGIN
+    koszt := koszt_rezerwacji(NEW.id_rezerwacji);
+    SELECT COALESCE(SUM(kwota), 0) INTO wplacono FROM platnosc WHERE 
+    id_rezerwacji = NEW.id_rezerwacji AND id_platnosci <> NEW.id_platnosci;
+    IF wplacono + NEW.kwota > koszt THEN
+        RAISE EXCEPTION 'Wpłata w wysokości % przekracza brakującą dopłatę za rezerwację % (brakuje % zl)', NEW.kwota, NEW.id_rezerwacji, koszt - wplacono
+        USING HINT = 'Zaksięguj kwotę nie większą niż pozostała dopłata';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_blokada_nadplaty BEFORE INSERT OR UPDATE ON platnosc 
+FOR EACH ROW EXECUTE FUNCTION blokuj_nadplate();
 
 -- widoki
 
